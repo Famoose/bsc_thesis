@@ -4,11 +4,14 @@ import gym_super_mario_bros
 import numpy as np
 from gym.wrappers import GrayScaleObservation
 from nes_py.wrappers import JoypadSpace
+from stable_baselines3.common.callbacks import BaseCallback
 # Import Vectorization Wrappers
 from stable_baselines3.common.vec_env import VecFrameStack, DummyVecEnv, SubprocVecEnv, vec_monitor
 from stable_baselines3.common.monitor import Monitor
 from typing import Callable
 from stable_baselines3.common.utils import set_random_seed
+import torch as th
+from stable_baselines3.common.logger import Video
 
 MOVEMENT = [["right"], ["right", "A"]]
 STAGE_PIXEL = 'SuperMarioBros-1-1-v0'
@@ -105,3 +108,56 @@ def make_single_env(env_id):
     env = DummyVecEnv([lambda: env])
     env = VecFrameStack(env, 4, channels_order='last')
     return env
+
+
+class TrainAndLoggingCallback(BaseCallback):
+
+    def __init__(self, check_freq, test_env, episode_num, verbose=1):
+        super(TrainAndLoggingCallback, self).__init__(verbose)
+        self.check_freq = check_freq
+        self.test_env = test_env
+        self.episode_num = episode_num
+        self.MAX_TIMESTEP_TEST = 1000
+
+    def _on_step(self):
+        if self.n_calls % self.check_freq == 0:
+            screens = []
+            total_reward = [0] * self.episode_num
+            total_time = [0] * self.episode_num
+            best_reward = 0
+            for i in range(self.episode_num):
+
+                state = self.test_env.reset()  # reset for each new trial
+                done = False
+                total_reward[i] = 0
+                total_time[i] = 0
+                while not done and total_time[i] < self.MAX_TIMESTEP_TEST:
+                    action, _ = self.model.predict(state)
+                    state, reward, done, info = self.test_env.step(action)
+                    total_reward[i] += reward[0]
+                    total_time[i] += 1
+                    screen = self.test_env.render(mode="rgb_array")
+                    # PyTorch uses CxHxW vs HxWxC gym (and tensorflow) image convention
+                    screens.append(screen.transpose(2, 0, 1))
+
+                if total_reward[i] > best_reward:
+                    best_reward = total_reward[i]
+                    best_epoch = self.n_calls
+
+                state = self.test_env.reset()  # reset for each new trial
+
+            print('time steps:', self.num_timesteps)
+            print('average reward:', (sum(total_reward) / self.episode_num),
+                  'average time:', (sum(total_time) / self.episode_num),
+                  'best_reward:', best_reward)
+
+            self.logger.record("eval/mean_reward", (sum(total_reward) / self.episode_num))
+            self.logger.record("eval/mean_time", (sum(total_time) / self.episode_num))
+            self.logger.record("eval/best_reward", best_reward)
+            self.logger.record(
+                "trajectory/video",
+                Video(th.ByteTensor([screens]), fps=40),
+                exclude=("stdout", "log", "json", "csv"),
+            )
+
+        return True

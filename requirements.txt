@@ -7,3 +7,4 @@ shimmy<=0.2.1
 pip==21
 setuptools==65.5.0
 tensorboard==2.16.2
+moviepy==1.0.3
