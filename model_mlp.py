@@ -66,24 +66,24 @@ class MarioNetMLP4(BaseFeaturesExtractor):
 
     def __init__(self, observation_space: gym.spaces.Box, features_dim):
         super(MarioNetMLP4, self).__init__(observation_space, features_dim)
-        n_input_channels = observation_space.shape[0] * observation_space.shape[1] * observation_space.shape[2]
+        self.n_input_channels = observation_space.shape[0] * observation_space.shape[1] * observation_space.shape[2]
         self.start = nn.Sequential(
             nn.Flatten(),
         )
         self.first_1 = nn.Sequential(
-            nn.Linear(n_input_channels / 4, 220),
+            nn.Linear(int(self.n_input_channels / 4), 220),
             nn.ReLU(),
         )
         self.first_2 = nn.Sequential(
-            nn.Linear(n_input_channels / 4, 220),
+            nn.Linear(int(self.n_input_channels / 4), 220),
             nn.ReLU(),
         )
         self.first_3 = nn.Sequential(
-            nn.Linear(n_input_channels / 4, 220),
+            nn.Linear(int(self.n_input_channels / 4), 220),
             nn.ReLU(),
         )
         self.first_4 = nn.Sequential(
-            nn.Linear(n_input_channels / 4, 220),
+            nn.Linear(int(self.n_input_channels / 4), 220),
             nn.ReLU(),
         )
         self.second_1 = nn.Sequential(
@@ -101,10 +101,10 @@ class MarioNetMLP4(BaseFeaturesExtractor):
 
     def forward(self, observations: th.Tensor) -> th.Tensor:
         result = self.start(observations)
-        result_first_1 = self.first_1(result[:, :int(observations.shape[1] / 4)])
-        result_first_2 = self.first_2(result[:, int(observations.shape[1] / 4):int(observations.shape[1] / 2)])
-        result_first_3 = self.first_3(result[:, int(observations.shape[1] / 2):int(3 * observations.shape[1] / 4)])
-        result_first_4 = self.first_4(result[:, int(3 * observations.shape[1] / 4):])
+        result_first_1 = self.first_1(result[:, :int(self.n_input_channels / 4)])
+        result_first_2 = self.first_2(result[:, int(self.n_input_channels / 4):int(self.n_input_channels / 2)])
+        result_first_3 = self.first_3(result[:, int(self.n_input_channels / 2):int(3 * self.n_input_channels / 4)])
+        result_first_4 = self.first_4(result[:, int(3 * self.n_input_channels / 4):])
         result_second_1 = self.second_1(th.cat((result_first_1, result_first_2), 1))
         result_second_2 = self.second_2(th.cat((result_first_3, result_first_4), 1))
         result_third = self.third(th.cat((result_second_1, result_second_2), 1))
